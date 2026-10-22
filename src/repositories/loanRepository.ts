@@ -46,6 +46,29 @@ export function countActiveLoans(memberId: number): number {
   return loans.filter((loan) => loan.memberId === memberId && loan.returnedAt === null).length;
 }
 
+export type LoanStatusFilter = 'active' | 'returned';
+
+export function listLoansByMember(
+  memberId: number,
+  status?: LoanStatusFilter,
+): readonly Loan[] {
+  return loans.filter((loan) => {
+    if (loan.memberId !== memberId) {
+      return false;
+    }
+
+    if (status === 'active') {
+      return loan.returnedAt === null;
+    }
+
+    if (status === 'returned') {
+      return loan.returnedAt !== null;
+    }
+
+    return true;
+  });
+}
+
 export function markReturned(id: number, returnedAt: string): Loan | undefined {
   const loan = findLoanById(id);
   if (!loan) {

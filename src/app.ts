@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction, RequestHandler } from 'express';
 import { HttpError } from './errors/httpError';
 import { requireServiceKey } from './middleware/requireServiceKey';
+import { internalLoansRouter } from './routes/internalLoans';
 import { loansRouter } from './routes/loans';
 
 const app = express();
@@ -21,6 +22,8 @@ const serviceKeyGate: RequestHandler = (req, res, next) => {
 };
 
 app.use(serviceKeyGate);
+
+app.use('/internal', internalLoansRouter);
 
 app.use('/loans', loansRouter);
 
