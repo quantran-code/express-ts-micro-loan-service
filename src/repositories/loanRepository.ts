@@ -69,6 +69,10 @@ export function listLoansByMember(
   });
 }
 
+export function listAllLoans(): readonly Loan[] {
+  return [...loans];
+}
+
 export function markReturned(id: number, returnedAt: string): Loan | undefined {
   const loan = findLoanById(id);
   if (!loan) {

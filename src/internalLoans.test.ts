@@ -203,4 +203,89 @@ describe('GET /internal/loans', () => {
     expect(response.status).toBe(401);
     expect((response.body as ErrorBody).error).toBe('Invalid user identity');
   });
+
+  it('returns every loan, returned and unreturned, when no filter is given', async () => {
+    const activeDue = daysFromNow(10);
+    seedLoan(1, 7, activeDue);
+    seedLoan(2, 8, daysFromNow(5));
+    const returnedAt = new Date().toISOString();
+    markReturned(2, returnedAt);
+
+    const response = await request(app).get('/internal/loans').set(serviceKeyHeaders());
+
+    expect(response.status).toBe(200);
+
+    const body = response.body as Loan[];
+    expect(body).toHaveLength(2);
+    expect(body.map((loan) => loan.id)).toEqual([1, 2]);
+    expect(body[0].bookId).toBe(1);
+    expect(body[0].memberId).toBe(7);
+    expect(body[0].borrowedAt).toBe('2024-01-01T00:00:00.000Z');
+    expect(body[0].returnedAt).toBeNull();
+    expect(body[0].dueDate).toBe(activeDue);
+    expect(body[1].returnedAt).toBe(returnedAt);
+    expect(body[1].dueDate).toBeDefined();
+  });
+
+  it('returns an empty array when no loan exists at all', async () => {
+    const response = await request(app).get('/internal/loans').set(serviceKeyHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body as Loan[]).toEqual([]);
+  });
+
+  it('rejects an unfiltered request without x-service-key', async () => {
+    const response = await request(app).get('/internal/loans');
+
+    expect(response.status).toBe(401);
+    expect((response.body as ErrorBody).error).toBe('Invalid service key');
+  });
+});
+
+describe('GET /internal/loans/overdue', () => {
+  it('rejects a request without x-service-key', async () => {
+    const response = await request(app).get('/internal/loans/overdue');
+
+    expect(response.status).toBe(401);
+    expect((response.body as ErrorBody).error).toBe('Invalid service key');
+  });
+
+  it('rejects a request with the wrong x-service-key', async () => {
+    const response = await request(app)
+      .get('/internal/loans/overdue')
+      .set({ 'x-service-key': 'wrong-key' });
+
+    expect(response.status).toBe(401);
+    expect((response.body as ErrorBody).error).toBe('Invalid service key');
+  });
+
+  it('returns only unreturned loans whose dueDate has passed, including dueDate', async () => {
+    const pastDue = daysFromNow(-2);
+    seedLoan(1, 7, pastDue);
+    seedLoan(2, 8, daysFromNow(5));
+    seedLoan(3, 9, daysFromNow(-3));
+    markReturned(3, new Date().toISOString());
+
+    const response = await request(app).get('/internal/loans/overdue').set(serviceKeyHeaders());
+
+    expect(response.status).toBe(200);
+
+    const body = response.body as Loan[];
+    expect(body).toHaveLength(1);
+    expect(body[0].id).toBe(1);
+    expect(body[0].bookId).toBe(1);
+    expect(body[0].memberId).toBe(7);
+    expect(body[0].borrowedAt).toBe('2024-01-01T00:00:00.000Z');
+    expect(body[0].returnedAt).toBeNull();
+    expect(body[0].dueDate).toBe(pastDue);
+  });
+
+  it('returns an empty array when nothing is overdue', async () => {
+    seedLoan(1, 7, daysFromNow(5));
+
+    const response = await request(app).get('/internal/loans/overdue').set(serviceKeyHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body as Loan[]).toEqual([]);
+  });
 });
